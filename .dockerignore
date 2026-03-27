@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+.env.*
+*.log
+.git
+.gitignore
+README.md
+coverage
+.nyc_output
+docker-compose*.yml
+Dockerfile*
+.DS_Store
+*.md
+src/**/*.test.ts
+src/**/*.spec.ts

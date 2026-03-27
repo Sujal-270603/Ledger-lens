@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Prisma
+prisma/migrations/dev/
+*.db
+*.db-journal
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+postgres_data/
+localstack_data/
+
+# Coverage
+coverage/
+.nyc_output/

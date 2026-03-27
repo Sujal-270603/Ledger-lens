@@ -1,0 +1,390 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/////////////////////////////////////////////////
+// ENUMS
+/////////////////////////////////////////////////
+
+enum RoleType {
+  ADMIN
+  USER
+  VIEWER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  FAILED
+}
+
+enum SyncStatus {
+  NOT_SYNCED
+  SYNCED
+  ERROR
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+
+
+/////////////////////////////////////////////////
+// RBAC
+/////////////////////////////////////////////////
+
+model Role {
+  id          String           @id @default(uuid())
+  name        RoleType         @unique
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role        Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission  Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+/////////////////////////////////////////////////
+// ORGANIZATION
+/////////////////////////////////////////////////
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  gstin     String?  @unique
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  clients       Client[]
+  documents     Document[]
+  invoices      Invoice[]
+  ledgers       Ledger[]
+  subscriptions Subscription?
+  billingHistories BillingHistory[]
+  
+  usageQuotas   UsageQuota[]
+}
+
+/////////////////////////////////////////////////
+// USERS
+/////////////////////////////////////////////////
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String
+  fullName       String
+
+  roleId         String
+  role             Role     @relation(fields: [roleId], references: [id])
+
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+
+  clientAccess     UserClientAccess[]
+  auditLogs        AuditLog[]
+  approvedInvoices Invoice[]          @relation("ApprovedInvoices")
+  reopenedInvoices Invoice[]          @relation("ReopenedInvoices")
+  submittedInvoices Invoice[]         @relation("SubmittedInvoices")
+  rejectedInvoices  Invoice[]         @relation("RejectedInvoices")
+  refreshTokens    RefreshToken[]
+
+  isActive         Boolean            @default(true)
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+/////////////////////////////////////////////////
+// AUTHENTICATION
+/////////////////////////////////////////////////
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/////////////////////////////////////////////////
+// CLIENT ACCESS CONTROL
+/////////////////////////////////////////////////
+
+model UserClientAccess {
+  id        String  @id @default(uuid())
+  userId    String
+  clientId  String
+
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+}
+
+/////////////////////////////////////////////////
+// CLIENT
+/////////////////////////////////////////////////
+
+model Client {
+  id             String       @id @default(uuid())
+  name           String
+  gstin          String?
+  email          String?
+  phone          String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  invoices       Invoice[]
+  ledgers        Ledger[]
+  userAccess     UserClientAccess[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, gstin])
+}
+
+/////////////////////////////////////////////////
+// DOCUMENT
+/////////////////////////////////////////////////
+
+model Document {
+  id             String       @id @default(uuid())
+  s3Key          String
+  originalName   String
+  mimeType       String
+  size           Int
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  uploadedBy     String?
+
+  invoices       Invoice[]
+
+  createdAt      DateTime     @default(now())
+}
+
+/////////////////////////////////////////////////
+// INVOICE
+/////////////////////////////////////////////////
+
+model Invoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String
+  invoiceDate    DateTime
+
+  totalAmount    Decimal       @db.Decimal(14, 2)
+  gstAmount      Decimal       @db.Decimal(14, 2)
+
+  cgstAmount     Decimal?      @db.Decimal(14, 2)
+  sgstAmount     Decimal?      @db.Decimal(14, 2)
+  igstAmount     Decimal?      @db.Decimal(14, 2)
+
+  status         InvoiceStatus @default(DRAFT)
+  syncStatus     SyncStatus    @default(NOT_SYNCED)
+
+  confidenceScore Float?
+  aiMetadata     Json?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id])
+
+  documentId     String?
+  document       Document?    @relation(fields: [documentId], references: [id])
+
+  items          InvoiceItem[]
+  journalEntries JournalEntry[]
+
+  // Approval Workflow
+  submittedAt     DateTime?
+  submittedById   String?
+  submittedBy     User?        @relation("SubmittedInvoices", fields: [submittedById], references: [id])
+
+  approvedAt      DateTime?
+  approvedById    String?
+  approvedBy      User?        @relation("ApprovedInvoices", fields: [approvedById], references: [id])
+
+  rejectedAt      DateTime?
+  rejectedById    String?
+  rejectedBy      User?        @relation("RejectedInvoices", fields: [rejectedById], references: [id])
+  rejectionReason String?
+
+  reopenedAt      DateTime?
+  reopenedById    String?
+  reopenedBy      User?        @relation("ReopenedInvoices", fields: [reopenedById], references: [id])
+  reopenReason    String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+/////////////////////////////////////////////////
+// INVOICE ITEMS
+/////////////////////////////////////////////////
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  description String
+  hsnCode     String?
+  quantity    Decimal  @db.Decimal(14, 2)
+  unitPrice   Decimal  @db.Decimal(14, 2)
+  amount      Decimal  @db.Decimal(14, 2)
+  taxRate     Decimal  @db.Decimal(5, 2)
+
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+/////////////////////////////////////////////////
+// LEDGER + ACCOUNTING
+/////////////////////////////////////////////////
+
+model Ledger {
+  id             String   @id @default(uuid())
+  name           String
+  clientId       String
+  client         Client   @relation(fields: [clientId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  journalLines   JournalLine[]
+  createdAt      DateTime @default(now())
+
+  @@unique([clientId, name])
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  entryDate   DateTime
+  description String?
+  isAutoGenerated Boolean @default(true)
+
+  lines       JournalLine[]
+  createdAt   DateTime @default(now())
+}
+
+model JournalLine {
+  id          String   @id @default(uuid())
+  journalId   String
+  journal     JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  ledgerId    String
+  ledger      Ledger   @relation(fields: [ledgerId], references: [id])
+
+  debit       Decimal? @db.Decimal(14, 2)
+  credit      Decimal? @db.Decimal(14, 2)
+}
+
+/////////////////////////////////////////////////
+// SUBSCRIPTION
+/////////////////////////////////////////////////
+
+model Subscription {
+  id             String             @id @default(uuid())
+  organizationId String             @unique
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  plan           SubscriptionPlan
+  status         SubscriptionStatus
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelledAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model BillingHistory {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  amount         Decimal       @db.Decimal(10, 2)
+  currency       String        @default("INR")
+  status         PaymentStatus
+  description    String
+  invoiceUrl     String?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+}
+
+/////////////////////////////////////////////////
+// USAGE QUOTA
+/////////////////////////////////////////////////
+
+model UsageQuota {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  invoicesProcessed Int       @default(0)
+  invoicesLimit     Int       @default(100)
+
+  resetDate      DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+/////////////////////////////////////////////////
+// AUDIT LOG
+/////////////////////////////////////////////////
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  resource  String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
