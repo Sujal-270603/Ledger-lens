@@ -32,8 +32,8 @@ export const env = cleanEnv(process.env, {
   // OPENAI_API_KEY: str(),
   GEMINI_API_KEY: str(),
   
-  // Razorpay
-  RAZORPAY_KEY_ID: str(),
-  RAZORPAY_KEY_SECRET: str(),
-  RAZORPAY_WEBHOOK_SECRET: str(),
+  // // Razorpay
+  // RAZORPAY_KEY_ID: str(),
+  // RAZORPAY_KEY_SECRET: str(),
+  // RAZORPAY_WEBHOOK_SECRET: str(),
 });

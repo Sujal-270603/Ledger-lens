@@ -21,7 +21,6 @@ const start = async () => {
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
     app.log.info(`Server running at http://${env.HOST}:${env.PORT}`);
-    app.log.info(`Documentation running at http://${env.HOST}:${env.PORT}/docs`);
 
     // // Start background workers
     // import('./workers/ai-processing.worker').then(({ startAIProcessingWorker }) => {

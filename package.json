@@ -4,7 +4,7 @@
   "description": "Enterprise GST ID Processing Backend",
   "main": "dist/server.js",
   "scripts": {
-    "seed": "ts-node prisma/seed.ts",
+    "seed": "node prisma/seed.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
@@ -17,7 +17,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run workers\""
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.400.0",
@@ -30,8 +30,6 @@
     "@fastify/jwt": "^7.2.4",
     "@fastify/rate-limit": "^9.0.1",
     "@fastify/sensible": "^5.5.0",
-    "@fastify/swagger": "^8.12.0",
-    "@fastify/swagger-ui": "^1.10.1",
     "@google/genai": "^1.45.0",
     "@prisma/client": "^5.7.0",
     "axios": "^1.6.2",

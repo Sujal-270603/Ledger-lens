@@ -1,5 +1,4 @@
-version: '3.9'
-
+# version is obsolete
 services:
 
   # ── PostgreSQL ────────────────────────────────────────
@@ -8,15 +7,15 @@ services:
     container_name: ledgerlens_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       ledgerlens
-      POSTGRES_USER:     ledgerlens
-      POSTGRES_PASSWORD: ledgerlens_dev_password
+      POSTGRES_DB:       ${POSTGRES_DB:-ledgerlens}
+      POSTGRES_USER:     ${POSTGRES_USER:-ledgerlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ledgerlens_dev_password}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ledgerlens"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ledgerlens}"]
       interval: 10s
       timeout:  5s
       retries:  5
@@ -27,33 +26,12 @@ services:
     container_name: ledgerlens_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout:  5s
       retries:  5
-
-  # ── LocalStack (AWS SQS + S3 locally) ─────────────────
-  localstack:
-    image: localstack/localstack:latest
-    container_name: ledgerlens_localstack
-    restart: unless-stopped
-    ports:
-      - "4566:4566"
-    environment:
-      SERVICES:        s3,sqs
-      DEFAULT_REGION:  ap-south-1
-      DATA_DIR:        /var/lib/localstack
-      DOCKER_HOST:     unix:///var/run/docker.sock
-    volumes:
-      - localstack_data:/var/lib/localstack
-      - ./localstack-setup.sh:/etc/localstack/init/ready.d/init.sh
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-      interval: 10s
-      timeout:  5s
-      retries:  10
 
   # ── Backend ───────────────────────────────────────────
   backend:
@@ -65,29 +43,29 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV:              development
-      DATABASE_URL:          postgresql://ledgerlens:ledgerlens_dev_password@postgres:5432/ledgerlens
-      REDIS_URL:             redis://redis:6379
-      JWT_SECRET:            dev-jwt-secret-change-in-production
-      JWT_REFRESH_SECRET:    dev-refresh-secret-change-in-production
-      AWS_REGION:            ap-south-1
-      AWS_ACCESS_KEY_ID:     test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_S3_BUCKET:         ledgerlens-documents
-      AWS_SQS_QUEUE_URL:     http://localstack:4566/000000000000/ledgerlens-processing.fifo
+      NODE_ENV:              ${NODE_ENV:-development}
+      DATABASE_URL:          ${DATABASE_URL}
+      REDIS_URL:             ${REDIS_URL:-redis://redis:6379}
+      REDIS_HOST:            ${REDIS_HOST:-redis}
+      REDIS_PORT:            ${REDIS_PORT:-6379}
+      JWT_SECRET:            ${JWT_SECRET}
+      JWT_REFRESH_SECRET:    ${JWT_REFRESH_SECRET}
+      AWS_REGION:            ${AWS_REGION}
+      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET:         ${AWS_S3_BUCKET}
+      AWS_SQS_QUEUE_URL:     ${AWS_SQS_QUEUE_URL}
       GEMINI_API_KEY:        ${GEMINI_API_KEY}
-      INTERNAL_API_KEY:      dev-internal-key
+      INTERNAL_API_KEY:      ${INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      localstack:
-        condition: service_healthy
     command: >
       sh -c "
         npx prisma migrate deploy &&
-        npx prisma db seed &&
+        node prisma/seed.js &&
         node dist/server.js
       "
     healthcheck:
@@ -105,35 +83,21 @@ services:
     container_name: ledgerlens_worker
     restart: unless-stopped
     environment:
-      NODE_ENV:              development
-      DATABASE_URL:          postgresql://ledgerlens:ledgerlens_dev_password@postgres:5432/ledgerlens
-      REDIS_URL:             redis://redis:6379
-      AWS_REGION:            ap-south-1
-      AWS_ACCESS_KEY_ID:     test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_S3_BUCKET:         ledgerlens-documents
-      AWS_SQS_QUEUE_URL:     http://localstack:4566/000000000000/ledgerlens-processing.fifo
+      NODE_ENV:              ${NODE_ENV:-development}
+      DATABASE_URL:          ${DATABASE_URL}
+      REDIS_URL:             ${REDIS_URL:-redis://redis:6379}
+      REDIS_HOST:            ${REDIS_HOST:-redis}
+      REDIS_PORT:            ${REDIS_PORT:-6379}
+      AWS_REGION:            ${AWS_REGION}
+      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET:         ${AWS_S3_BUCKET}
+      AWS_SQS_QUEUE_URL:     ${AWS_SQS_QUEUE_URL}
       GEMINI_API_KEY:        ${GEMINI_API_KEY}
-      INTERNAL_API_KEY:      dev-internal-key
-    depends_on:
-      backend:
-        condition: service_healthy
-
-  # ── Frontend ──────────────────────────────────────────
-  frontend:
-    build:
-      context:    ../Frontend
-      dockerfile: Dockerfile
-    container_name: ledgerlens_frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    environment:
-      VITE_API_BASE_URL: /api/v1
+      INTERNAL_API_KEY:      ${INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
       backend:
         condition: service_healthy
 
 volumes:
   postgres_data:
-  localstack_data:

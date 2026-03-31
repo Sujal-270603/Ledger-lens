@@ -3,8 +3,6 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
-import swagger from '@fastify/swagger';
-import swaggerUi from '@fastify/swagger-ui';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { errorHandler } from './middleware/error.middleware';
 import { env } from './config/env';
@@ -67,34 +65,6 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     secret: env.JWT_SECRET,
   });
 
-  // Swagger
-  await app.register(swagger, {
-    openapi: {
-      info: {
-        title: 'GST AI Invoice Processor API',
-        description: 'Enterprise API for GST Invoice Processing',
-        version: '1.0.0',
-      },
-      components: {
-        securitySchemes: {
-          bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT',
-          },
-          apiKey: {
-            type: 'apiKey',
-            name: 'x-api-key',
-            in: 'header',
-          },
-        },
-      },
-    },
-  });
-
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-  });
 
   // Health Check
   app.get('/health', async (request, reply) => {

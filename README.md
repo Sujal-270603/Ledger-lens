@@ -61,7 +61,3 @@ Run workers separately or via PM2:
 ```bash
 npx ts-node src/workers/invoice.worker.ts
 ```
-
-## API Documentation
-
-Swagger UI is available at `/docs` when server is running.

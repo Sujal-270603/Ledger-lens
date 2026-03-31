@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 // ALL PERMISSIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PERMISSIONS: { name: string; description: string }[] = [
+const PERMISSIONS = [
   // ── Invoice ──────────────────────────────────────────────────────────────
   { name: 'CREATE_INVOICE',       description: 'Create a new invoice manually' },
   { name: 'EDIT_INVOICE',         description: 'Edit a DRAFT or REJECTED invoice' },
@@ -52,7 +52,7 @@ const PERMISSIONS: { name: string; description: string }[] = [
 // ROLE → PERMISSION MAPPING
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ROLE_PERMISSIONS: Record<RoleType, string[]> = {
+const ROLE_PERMISSIONS = {
   // ADMIN gets every single permission
   ADMIN: PERMISSIONS.map((p) => p.name),
 
@@ -106,9 +106,9 @@ async function main() {
   for (const [roleName, permissionNames] of Object.entries(ROLE_PERMISSIONS)) {
     // Upsert the role
     const role = await prisma.role.upsert({
-      where:  { name: roleName as RoleType },
+      where:  { name: roleName },
       update: {},
-      create: { name: roleName as RoleType },
+      create: { name: roleName },
     });
 
     // Fetch IDs for permissions assigned to this role
