@@ -53,7 +53,13 @@ export const buildApp = async (): Promise<FastifyInstance> => {
 
   // Middleware
   await app.register(helmet);
-  await app.register(cors);
+  await app.register(cors, {
+  origin: [
+    'http://localhost:5173', 
+    'https://ledger-lens-frontend-nu.vercel.app' // <-- This must be here!
+  ],
+      credentials: true
+  });
   
   await app.register(rateLimit, {
     max: 100,

@@ -28,7 +28,7 @@ async function setupCors() {
           // 'http://localhost:5174',
           // 'http://localhost:5175',
           // 'http://localhost:3000',
-          'https://ledger-lens-frontend-nu.vercel.app/'
+          'https://ledger-lens-frontend-nu.vercel.app'
         ],
         ExposeHeaders: ['ETag'],
         MaxAgeSeconds: 3000
