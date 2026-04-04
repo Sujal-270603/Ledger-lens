@@ -16,7 +16,7 @@ RUN npm run build
 FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apt-get update -y && apt-get install -y openssl
+RUN apt-get update -y && apt-get install -y openssl wget
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 ledgerlens
