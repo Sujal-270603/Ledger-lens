@@ -54,7 +54,7 @@ services:
       AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_S3_BUCKET:         ${AWS_S3_BUCKET}
-      AWS_SQS_QUEUE_URL:     https://sqs.eu-north-1.amazonaws.com/555212088412/Ledgerlens-v2
+      AWS_SQS_QUEUE_URL:     ${AWS_SQS_QUEUE_URL}
       GEMINI_API_KEY:        ${GEMINI_API_KEY}
       INTERNAL_API_KEY:      ${INTERNAL_API_KEY:-dev-internal-key}
       RUN_WORKER:            'true'
