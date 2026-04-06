@@ -61,13 +61,25 @@ export const receiveMessages = async (maxMessages?: number): Promise<any[]> => {
     AttributeNames: ['All'],
     MessageAttributeNames: ['All'],
   });
-  logger.info(`Receiving messages from SQS processing queue`);
+  const startTime = Date.now();
+  logger.debug({ queueUrl, startTime }, 'Starting SQS Long Poll request');
   try {
     const response = await sqsClient.send(command);
-    return response.Messages || [];
+    const duration = Date.now() - startTime;
+    const messages = response.Messages || [];
+    
+    logger.info({ 
+      messageCount: messages.length, 
+      durationMs: duration,
+      requestId: response.$metadata.requestId 
+    }, 'SQS Poll Finished');
+    
+    return messages;
   } catch (error: any) {
+    const duration = Date.now() - startTime;
     logger.error({ 
       err: error,
+      durationMs: duration,
       queueUrl,
       requestId: error.$metadata?.requestId
     }, 'Failed to receive messages from SQS processing queue');

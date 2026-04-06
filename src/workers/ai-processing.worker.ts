@@ -251,14 +251,10 @@ export async function startAIProcessingWorker(): Promise<void> {
 
   while (!isShuttingDown) {
     try {
+      logger.info('Starting new poll');
       const messages = await receiveMessages(5);
-
-      if (messages.length === 0) {
-        // Short-polling: sleep 2s before checking again to avoid hammering the API
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-
+      logger.info({ messageCount: messages.length }, 'Poll returned');
+      
       if (messages.length > 0) {
         for (const message of messages) {
           try {

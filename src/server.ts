@@ -45,7 +45,7 @@ const start = async () => {
         documentsService.markStaleDocumentsAsFailed().catch((err) => {
           app.log.error({ err }, 'Failed to execute stale document cron job in server interval.');
         });
-      }, 2 * 60 * 1000); // 5 minutes
+      }, 2 * 60 * 1000); // 2 minutes
 
       app.log.info('AI processing worker started successfully');
     }
