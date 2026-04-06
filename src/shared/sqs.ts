@@ -1,5 +1,5 @@
-// src/shared/sqs.ts
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { ServiceUnavailableError } from '../errors';
 import { logger } from '../common/logger/logger';
 
@@ -8,7 +8,11 @@ const sqsClient = new SQSClient({
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'dummy-access-key',
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'dummy-secret-key',
-  }
+  },
+  requestHandler: new NodeHttpHandler({
+    connectionTimeout: 5000,
+    requestTimeout: 27000, // Slightly higher than WaitTimeSeconds (20s) to prevent false-positive socket drops
+  })
 });
 
 export const sendDocumentProcessingMessage = async (payload: {
@@ -18,8 +22,10 @@ export const sendDocumentProcessingMessage = async (payload: {
   mimeType: string;
 }): Promise<void> => {
   const queueUrl = process.env.AWS_SQS_QUEUE_URL;
+  logger.info(`Queue URL: ${queueUrl}`);
   if (!queueUrl) throw new Error('AWS_SQS_QUEUE_URL environment variable is not set');
-
+  
+  logger.info(`Sending SQS message for document ${payload.documentId}`);
   const command = new SendMessageCommand({
     QueueUrl: queueUrl,
     MessageBody: JSON.stringify(payload),
@@ -47,22 +53,24 @@ export const receiveMessages = async (maxMessages?: number): Promise<any[]> => {
   if (!queueUrl) throw new Error('AWS_SQS_QUEUE_URL environment variable is not set');
 
   const { ReceiveMessageCommand } = await import('@aws-sdk/client-sqs');
-  
-  // Short-polling (WaitTimeSeconds: 0): each call returns immediately.
-  // This eliminates the long-lived TCP connection problem that caused silent drops.
-  // The worker loop adds a sleep between empty polls to avoid hammering the API.
+  logger.info({ queueUrl }, 'Receiving messages from SQS processing queue');
   const command = new ReceiveMessageCommand({
     QueueUrl: queueUrl,
     MaxNumberOfMessages: maxMessages || 10,
-    WaitTimeSeconds: 0,
+    WaitTimeSeconds: 20,
     AttributeNames: ['All'],
+    MessageAttributeNames: ['All'],
   });
-
+  logger.info(`Receiving messages from SQS processing queue`);
   try {
     const response = await sqsClient.send(command);
     return response.Messages || [];
   } catch (error: any) {
-    logger.error({ err: error }, 'Failed to receive messages from SQS processing queue');
+    logger.error({ 
+      err: error,
+      queueUrl,
+      requestId: error.$metadata?.requestId
+    }, 'Failed to receive messages from SQS processing queue');
     throw new ServiceUnavailableError('Processing queue');
   }
 };

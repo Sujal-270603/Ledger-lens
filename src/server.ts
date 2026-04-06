@@ -3,7 +3,8 @@ import { env } from './config/env';
 import { prisma } from './database/db';
 import { redis } from './database/redis';
 
-import { startAIProcessingWorker } from './workers/ai-processing.worker'; // ADD THIS
+import { startAIProcessingWorker } from './workers/ai-processing.worker';
+import { documentsService } from './modules/documents/documents.service';
 
 const start = async () => {
   const app = await buildApp();
@@ -38,6 +39,13 @@ const start = async () => {
         });
       };
       launchWorker();
+
+      // Launch background cron interval to mark endlessly stalled documents as FAILED
+      setInterval(() => {
+        documentsService.markStaleDocumentsAsFailed().catch((err) => {
+          app.log.error({ err }, 'Failed to execute stale document cron job in server interval.');
+        });
+      }, 2 * 60 * 1000); // 5 minutes
 
       app.log.info('AI processing worker started successfully');
     }

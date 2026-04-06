@@ -17,6 +17,7 @@ import { prisma } from '../../database/db';
 import { InvoiceStatus } from '../../types/prisma';
 import crypto from 'crypto';
 import { isAdminRole, getAssignedClientIds } from '../../shared/access';
+import { logger } from '../../common/logger/logger';
 
 export class DocumentsService {
   private async getAccessFilter(
@@ -25,6 +26,41 @@ export class DocumentsService {
   ): Promise<string[] | null> {
     if (isAdminRole(userRole)) return null;
     return getAssignedClientIds(userId);
+  }
+
+  async markStaleDocumentsAsFailed(): Promise<void> {
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    
+    try {
+      // Find stuck invoices using dynamic raw query to safely interrogate the JSONB aiMetadata
+      const stuckInvoices: any[] = await prisma.$queryRaw`
+        SELECT id, "aiMetadata"
+        FROM "Invoice"
+        WHERE status = 'DRAFT'
+          AND "aiMetadata"->>'processingStartedAt' IS NOT NULL
+          AND ("aiMetadata"->>'processingStartedAt')::timestamp < ${fifteenMinsAgo}
+      `;
+
+      if (stuckInvoices.length > 0) {
+        for (const invoice of stuckInvoices) {
+          const aiMetadata = typeof invoice.aiMetadata === 'string' ? JSON.parse(invoice.aiMetadata) : (invoice.aiMetadata || {});
+          await prisma.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              status: InvoiceStatus.FAILED,
+              aiMetadata: {
+                ...aiMetadata,
+                processingFailedAt: new Date().toISOString(),
+                errorMessage: 'Processing timed out after 15 minutes of inactivity'
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      // Intentionally log and swallow so the cron loop doesn't crash the server
+      console.error('Failed to run stale document cron job:', error);
+    }
   }
 
   private deriveProcessingStatus(invoices: any[], createdAt: Date): DocumentProcessingStatus {
@@ -42,12 +78,19 @@ export class DocumentsService {
       return DocumentProcessingStatus.FAILED;
     }
 
-    if (invoice.status === 'DRAFT' && invoice.aiMetadata && typeof invoice.aiMetadata === 'object' && 'processingStartedAt' in invoice.aiMetadata) {
-      const processingStartedAt = new Date(invoice.aiMetadata.processingStartedAt);
-      if (processingStartedAt < fiveMinutesAgo) {
-        return DocumentProcessingStatus.FAILED;
+    if (invoice.status === 'DRAFT' && invoice.aiMetadata && typeof invoice.aiMetadata === 'object') {
+      const meta = invoice.aiMetadata as any;
+      if (meta.processingCompletedAt) {
+        return DocumentProcessingStatus.COMPLETED;
       }
-      return DocumentProcessingStatus.PROCESSING;
+      
+      if (meta.processingStartedAt) {
+        const processingStartedAt = new Date(meta.processingStartedAt);
+        if (processingStartedAt < fiveMinutesAgo) {
+          return DocumentProcessingStatus.FAILED;
+        }
+        return DocumentProcessingStatus.PROCESSING;
+      }
     }
 
     return DocumentProcessingStatus.COMPLETED;
@@ -153,7 +196,7 @@ export class DocumentsService {
       s3Key: document.s3Key,
       mimeType: document.mimeType
     });
-
+    logger.info(`Document processing message sent for document ${documentId}`);
     await documentsRepository.createAuditLog({
       userId,
       action: 'CONFIRM_UPLOAD',
@@ -252,7 +295,18 @@ export class DocumentsService {
       throw new UnprocessableError('Only failed documents can be reprocessed');
     }
 
-    // If a failed invoice exists, reset it back to DRAFT with cleared error metadata
+    // Attempt to queue the message via SQS FIRST. 
+    // If this throws, it gracefully aborts here, bubbling a 503 and preventing ghost UI updates.
+    await sendDocumentProcessingMessage({
+      documentId,
+      organizationId,
+      s3Key: document.s3Key,
+      mimeType: document.mimeType
+    });
+
+    logger.info(`Document processing message sent for document ${documentId}`);
+
+    // SQS succeeded! Immediately reset the DB state so the UI reflects "PROCESSING"
     if (invoice) {
       const existingMetadata = (invoice.aiMetadata as any) || {};
       await prisma.invoice.update({
@@ -261,27 +315,28 @@ export class DocumentsService {
           status: InvoiceStatus.DRAFT,
           aiMetadata: {
             ...existingMetadata,
-            processingStartedAt: null,
+            processingStartedAt: new Date().toISOString(),
             processingCompletedAt: null,
             processingFailedAt: null,
             errorMessage: null,
+            retryCount: (existingMetadata.retryCount || 0) + 1
           }
         }
       });
+    } else {
+      // If there is no invoice yet (it dropped during initial SQS transit), 
+      // we update the Document's createdAt to give the frontend a fresh 5-minute PENDING window.
+      await prisma.document.update({
+        where: { id: documentId },
+        data: { createdAt: new Date() }
+      });
     }
-
-    await sendDocumentProcessingMessage({
-      documentId,
-      organizationId,
-      s3Key: document.s3Key,
-      mimeType: document.mimeType
-    });
 
     await documentsRepository.createAuditLog({
       userId,
       action: 'REPROCESS_DOCUMENT',
       resource: 'DOCUMENT',
-      details: { documentId, s3Key: document.s3Key }
+      details: { documentId, s3Key: document.s3Key, status: 'Re-queued successfully' }
     });
 
     return {

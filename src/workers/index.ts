@@ -1,6 +1,7 @@
 import { startAIProcessingWorker } from './ai-processing.worker';
 import { logger } from '../common/logger/logger';
 import { prisma } from '../database/db';
+import { documentsService } from '../modules/documents/documents.service';
 import * as http from 'http';
 
 async function main() {
@@ -33,6 +34,13 @@ async function main() {
   });
 
   try {
+    // Execute cron routine to garbage collect any infinitely stalled SQS messages
+    setInterval(() => {
+      documentsService.markStaleDocumentsAsFailed().catch((err) => {
+        logger.error({ err }, 'Failed to execute stale document cron job in worker interval.');
+      });
+    }, 5 * 60 * 1000);
+
     await startAIProcessingWorker();
   } catch (error) {
     logger.error({ err: error }, 'Worker crashed');
