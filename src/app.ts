@@ -56,7 +56,8 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   await app.register(cors, {
   origin: [
     'http://localhost:5173', 
-    'https://ledger-lens-frontend-nu.vercel.app' // <-- This must be here!
+    'http://localhost:8081',
+    'https://ledger-lens-frontend-nu.vercel.app'
   ],
       credentials: true
   });

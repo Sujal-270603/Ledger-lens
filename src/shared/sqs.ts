@@ -48,17 +48,20 @@ export const receiveMessages = async (maxMessages?: number): Promise<any[]> => {
 
   const { ReceiveMessageCommand } = await import('@aws-sdk/client-sqs');
   
+  // Short-polling (WaitTimeSeconds: 0): each call returns immediately.
+  // This eliminates the long-lived TCP connection problem that caused silent drops.
+  // The worker loop adds a sleep between empty polls to avoid hammering the API.
   const command = new ReceiveMessageCommand({
     QueueUrl: queueUrl,
-    MaxNumberOfMessages: maxMessages || 5,
-    WaitTimeSeconds: 20,
+    MaxNumberOfMessages: maxMessages || 10,
+    WaitTimeSeconds: 0,
     AttributeNames: ['All'],
   });
 
   try {
     const response = await sqsClient.send(command);
     return response.Messages || [];
-  } catch (error) {
+  } catch (error: any) {
     logger.error({ err: error }, 'Failed to receive messages from SQS processing queue');
     throw new ServiceUnavailableError('Processing queue');
   }

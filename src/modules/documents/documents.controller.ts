@@ -44,6 +44,13 @@ export class DocumentsController {
     return reply.status(200).send({ status: 'success', data: result });
   }
 
+  async reprocessDocument(request: FastifyRequest, reply: FastifyReply) {
+    const user = request.user;
+    const { documentId } = request.params as { documentId: string };
+    const result = await documentsService.reprocessDocument(documentId, user.organizationId, user.userId, user.role);
+    return reply.status(200).send({ status: 'success', data: result });
+  }
+
   async deleteDocument(request: FastifyRequest, reply: FastifyReply) {
     const user = request.user;
     const { documentId } = request.params as { documentId: string };

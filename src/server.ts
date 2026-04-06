@@ -30,12 +30,14 @@ const start = async () => {
 
       // startAIProcessingWorker runs as an infinite async loop
       // It does NOT block the HTTP server
-      // We catch errors so server keeps running if worker crashes
-      startAIProcessingWorker().catch((err) => {
-        app.log.error({ err }, 'AI worker crashed unexpectedly');
-        // Do not exit process — server must keep serving requests
-        // Worker will restart on next deployment
-      });
+      // We wrap it in a self-restarting loop so if the worker crashes it auto-restarts
+      const launchWorker = () => {
+        startAIProcessingWorker().catch((err) => {
+          app.log.error({ err }, 'AI worker crashed unexpectedly. Restarting in 5 seconds...');
+          setTimeout(launchWorker, 5000);
+        });
+      };
+      launchWorker();
 
       app.log.info('AI processing worker started successfully');
     }

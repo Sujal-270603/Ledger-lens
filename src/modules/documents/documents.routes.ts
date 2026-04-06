@@ -53,6 +53,14 @@ export async function documentsRoutes(app: FastifyInstance) {
     ]
   }, documentsController.generateDownloadUrl);
 
+  app.post('/:documentId/reprocess', {
+    preHandler: [
+      authenticate,
+      requirePermission('UPLOAD_DOCUMENT'),
+      validateParams
+    ]
+  }, documentsController.reprocessDocument);
+
   app.delete('/:documentId', {
     preHandler: [
       authenticate,

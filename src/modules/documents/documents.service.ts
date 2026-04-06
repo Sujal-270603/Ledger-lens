@@ -13,6 +13,8 @@ import { PaginatedResponse } from '../../shared/types';
 import { UnprocessableError, NotFoundError, ForbiddenError } from '../../errors';
 import { generatePresignedPutUrl, generatePresignedGetUrl, deleteS3Object } from '../../shared/s3';
 import { sendDocumentProcessingMessage } from '../../shared/sqs';
+import { prisma } from '../../database/db';
+import { InvoiceStatus } from '../../types/prisma';
 import crypto from 'crypto';
 import { isAdminRole, getAssignedClientIds } from '../../shared/access';
 
@@ -25,8 +27,13 @@ export class DocumentsService {
     return getAssignedClientIds(userId);
   }
 
-  private deriveProcessingStatus(invoices: any[]): DocumentProcessingStatus {
+  private deriveProcessingStatus(invoices: any[], createdAt: Date): DocumentProcessingStatus {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
     if (!invoices || invoices.length === 0) {
+      if (new Date(createdAt) < fiveMinutesAgo) {
+        return DocumentProcessingStatus.FAILED;
+      }
       return DocumentProcessingStatus.PENDING;
     }
 
@@ -36,6 +43,10 @@ export class DocumentsService {
     }
 
     if (invoice.status === 'DRAFT' && invoice.aiMetadata && typeof invoice.aiMetadata === 'object' && 'processingStartedAt' in invoice.aiMetadata) {
+      const processingStartedAt = new Date(invoice.aiMetadata.processingStartedAt);
+      if (processingStartedAt < fiveMinutesAgo) {
+        return DocumentProcessingStatus.FAILED;
+      }
       return DocumentProcessingStatus.PROCESSING;
     }
 
@@ -43,7 +54,7 @@ export class DocumentsService {
   }
 
   private mapToDocumentResponse(doc: any): DocumentResponse {
-    const processingStatus = this.deriveProcessingStatus(doc.invoices);
+    const processingStatus = this.deriveProcessingStatus(doc.invoices, doc.createdAt);
     const invoice = doc.invoices && doc.invoices.length > 0 ? {
       id: doc.invoices[0].id,
       status: doc.invoices[0].status
@@ -221,6 +232,61 @@ export class DocumentsService {
     return {
       downloadUrl,
       expiresInSeconds: 900
+    };
+  }
+
+  async reprocessDocument(
+    documentId: string,
+    organizationId: string,
+    userId: string,
+    userRole: string
+  ): Promise<DocumentResponse> {
+    const accessFilter = await this.getAccessFilter(userId, userRole);
+    const document = await documentsRepository.findDocumentByIdAndOrg(documentId, organizationId, userId, accessFilter);
+    if (!document) {
+      throw new NotFoundError('Document');
+    }
+
+    const invoice = document.invoices?.[0];
+    if (invoice && invoice.status !== 'FAILED') {
+      throw new UnprocessableError('Only failed documents can be reprocessed');
+    }
+
+    // If a failed invoice exists, reset it back to DRAFT with cleared error metadata
+    if (invoice) {
+      const existingMetadata = (invoice.aiMetadata as any) || {};
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: InvoiceStatus.DRAFT,
+          aiMetadata: {
+            ...existingMetadata,
+            processingStartedAt: null,
+            processingCompletedAt: null,
+            processingFailedAt: null,
+            errorMessage: null,
+          }
+        }
+      });
+    }
+
+    await sendDocumentProcessingMessage({
+      documentId,
+      organizationId,
+      s3Key: document.s3Key,
+      mimeType: document.mimeType
+    });
+
+    await documentsRepository.createAuditLog({
+      userId,
+      action: 'REPROCESS_DOCUMENT',
+      resource: 'DOCUMENT',
+      details: { documentId, s3Key: document.s3Key }
+    });
+
+    return {
+      ...this.mapToDocumentResponse(document),
+      processingStatus: DocumentProcessingStatus.PENDING
     };
   }
 

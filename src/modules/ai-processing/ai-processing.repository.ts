@@ -186,21 +186,23 @@ export class AIProcessingRepository {
     name: string,
     gstin: string | null,
     organizationId: string
-  ): Promise<Client> {
+  ): Promise<{ client: Client, isNew: boolean }> {
     if (gstin) {
       const existing = await prisma.client.findFirst({
         where: { gstin, organizationId }
       });
-      if (existing) return existing;
+      if (existing) return { client: existing, isNew: false };
     }
 
-    return prisma.client.create({
+    const client = await prisma.client.create({
       data: {
         name,
         gstin,
         organizationId
       }
     });
+    
+    return { client, isNew: true };
   }
 
   async createAuditLog(data: {

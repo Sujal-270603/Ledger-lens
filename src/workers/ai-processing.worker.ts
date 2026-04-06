@@ -91,12 +91,20 @@ const processMessage = async (message: any): Promise<WorkerProcessingResult> => 
     }
 
     let client = null;
+    let isNewClient = false;
     if (extraction.vendorName || extraction.vendorGstin) {
-      client = await aiProcessingRepository.findOrCreateClientByName(
+      const result = await aiProcessingRepository.findOrCreateClientByName(
         extraction.vendorName || 'Unknown Vendor',
         extraction.vendorGstin,
         organizationId
       );
+      client = result.client;
+      isNewClient = result.isNew;
+
+      if (isNewClient) {
+        const { ledgerService } = await import('../modules/ledger/ledger.service');
+        await ledgerService.createDefaultLedgers(client.id, organizationId);
+      }
     }
 
     const aiMetadata = {
@@ -181,7 +189,7 @@ const processMessage = async (message: any): Promise<WorkerProcessingResult> => 
     return { success: true, documentId, invoiceId: savedInvoice.id };
 
   } catch (error: any) {
-    logger.error({ error, documentId }, 'AI processing failed');
+    logger.error({ error, documentId }, 'AI processing critically failed. Marking status as FAILED in database.');
 
     try {
       const doc = await aiProcessingRepository.findDocumentById(documentId);
@@ -246,14 +254,15 @@ export async function startAIProcessingWorker(): Promise<void> {
       const messages = await receiveMessages(5);
 
       if (messages.length === 0) {
-        // No messages — receiveMessages already waited 20s (long polling)
-        // Loop immediately back to poll again
+        // Short-polling: sleep 2s before checking again to avoid hammering the API
+        await new Promise(resolve => setTimeout(resolve, 2000));
         continue;
       }
 
       if (messages.length > 0) {
         for (const message of messages) {
           try {
+            logger.info({ messageId: message.MessageId }, 'Queue consumed message for processing');
             await processMessage(message);
             if (message.ReceiptHandle) {
               await deleteMessage(message.ReceiptHandle);
@@ -261,7 +270,7 @@ export async function startAIProcessingWorker(): Promise<void> {
           } catch (processError) {
             // Error is already logged in processMessage, and message is not deleted so SQS will retry
             // Continue with next message
-            logger.error({ err: processError }, 'SQS polling error — retrying in 5s');
+            logger.warn({ messageId: message.MessageId, err: processError }, 'Message processing encountered an error. Preserving in queue for automatic retry.');
           }
         }
       }

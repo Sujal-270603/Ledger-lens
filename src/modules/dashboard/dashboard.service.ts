@@ -49,7 +49,7 @@ export class DashboardService {
     const totalInvoices = invoiceCounts.reduce((acc, curr) => acc + curr._count._all, 0);
     const approved = invoiceCounts.find(c => c.status === 'APPROVED')?._count._all || 0;
     const rejected = invoiceCounts.find(c => c.status === 'REJECTED')?._count._all || 0;
-    const pending = totalInvoices - approved - rejected;
+    const pending = invoiceCounts.find(c => c.status === 'SUBMITTED')?._count._all || 0;
 
     return {
       invoices: {
