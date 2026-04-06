@@ -3,6 +3,8 @@ import { env } from './config/env';
 import { prisma } from './database/db';
 import { redis } from './database/redis';
 
+import { startAIProcessingWorker } from './workers/ai-processing.worker'; // ADD THIS
+
 const start = async () => {
   const app = await buildApp();
 
@@ -23,11 +25,20 @@ const start = async () => {
     app.log.info(`Server running at http://${env.HOST}:${env.PORT}`);
 
     // // Start background workers
-    // import('./workers/ai-processing.worker').then(({ startAIProcessingWorker }) => {
-    //   startAIProcessingWorker().catch(err => {
-    //     app.log.error('Failed to start AI Processing Worker:', err);
-    //   });
-    // });
+    if (process.env.RUN_WORKER === 'true') {
+      app.log.info('Starting AI processing worker alongside server...');
+
+      // startAIProcessingWorker runs as an infinite async loop
+      // It does NOT block the HTTP server
+      // We catch errors so server keeps running if worker crashes
+      startAIProcessingWorker().catch((err) => {
+        app.log.error({ err }, 'AI worker crashed unexpectedly');
+        // Do not exit process — server must keep serving requests
+        // Worker will restart on next deployment
+      });
+
+      app.log.info('AI processing worker started successfully');
+    }
 
   } catch (err) {
     app.log.error(err);

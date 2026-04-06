@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "seed": "node prisma/seed.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "RUN_WORKER=true ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint . --ext .ts",
