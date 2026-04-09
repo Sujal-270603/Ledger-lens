@@ -108,7 +108,17 @@ export class InvoicesService {
         quantity: item.quantity.toString(),
         unitPrice: item.unitPrice.toString(),
         amount: item.amount.toString(),
-        taxRate: item.taxRate.toString()
+        taxRate: item.taxRate.toString(),
+        ledgerId: item.ledgerId,
+        creditLedgerId: item.creditLedgerId,
+        ledger: item.ledger ? {
+          id: item.ledger.id,
+          name: item.ledger.name
+        } : undefined,
+        creditLedger: item.creditLedger ? {
+          id: item.creditLedger.id,
+          name: item.creditLedger.name
+        } : undefined
       })),
       submittedAt: invoice.submittedAt,
       approvedAt: invoice.approvedAt,
@@ -263,7 +273,8 @@ export class InvoicesService {
         quantity: parseFloat(item.quantity.toString()),
         unitPrice: parseFloat(item.unitPrice.toString()),
         amount: parseFloat(item.amount.toString()),
-        taxRate: parseFloat(item.taxRate.toString())
+        taxRate: parseFloat(item.taxRate.toString()),
+        ledgerId: item.ledgerId
       }))
     };
     
@@ -342,7 +353,17 @@ export class InvoicesService {
       quantity: item.quantity.toString(),
       unitPrice: item.unitPrice.toString(),
       amount: item.amount.toString(),
-      taxRate: item.taxRate.toString()
+      taxRate: item.taxRate.toString(),
+      ledgerId: item.ledgerId,
+      creditLedgerId: item.creditLedgerId,
+      ledger: item.ledger ? {
+        id: item.ledger.id,
+        name: item.ledger.name
+      } : undefined,
+      creditLedger: item.creditLedger ? {
+        id: item.creditLedger.id,
+        name: item.creditLedger.name
+      } : undefined
     }));
   }
 
@@ -386,7 +407,13 @@ export class InvoicesService {
         data: { totalAmount: newTotal }
       });
 
-      return tx.invoiceItem.findMany({ where: { invoiceId } });
+      return tx.invoiceItem.findMany({
+        where: { invoiceId },
+        include: {
+          ledger: { select: { id: true, name: true } },
+          creditLedger: { select: { id: true, name: true } }
+        }
+      });
     });
 
     await invoicesRepository.createAuditLog({
@@ -403,7 +430,17 @@ export class InvoicesService {
       quantity: item.quantity.toString(),
       unitPrice: item.unitPrice.toString(),
       amount: item.amount.toString(),
-      taxRate: item.taxRate.toString()
+      taxRate: item.taxRate.toString(),
+      ledgerId: item.ledgerId,
+      creditLedgerId: item.creditLedgerId,
+      ledger: item.ledger ? {
+        id: item.ledger.id,
+        name: item.ledger.name
+      } : undefined,
+      creditLedger: item.creditLedger ? {
+        id: item.creditLedger.id,
+        name: item.creditLedger.name
+      } : undefined
     }));
   }
 }

@@ -291,7 +291,17 @@ export class AIProcessingService {
         quantity: item.quantity.toString(),
         unitPrice: item.unitPrice.toString(),
         amount: item.amount.toString(),
-        taxRate: item.taxRate.toString()
+        taxRate: item.taxRate.toString(),
+        ledgerId: item.ledgerId,
+        creditLedgerId: item.creditLedgerId,
+        ledger: item.ledger ? {
+          id: item.ledger.id,
+          name: item.ledger.name
+        } : undefined,
+        creditLedger: item.creditLedger ? {
+          id: item.creditLedger.id,
+          name: item.creditLedger.name
+        } : undefined
       })),
       submittedAt: fullInvoice.submittedAt,
       approvedAt: fullInvoice.approvedAt,

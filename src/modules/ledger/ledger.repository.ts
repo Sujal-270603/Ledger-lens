@@ -337,6 +337,68 @@ export class LedgerRepository {
       }
     });
   }
+  async findFirstJournalEntryByInvoice(
+    invoiceId: string,
+    organizationId: string
+  ): Promise<JournalEntryWithAll | null> {
+    const entries = await prisma.journalEntry.findMany({
+      where: { 
+        invoiceId,
+        invoice: { organizationId }
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 1,
+      include: {
+        lines: { include: { ledger: { select: { id: true, name: true } } } }
+      }
+    });
+
+    return (entries[0] as JournalEntryWithAll) || null;
+  }
+
+  async appendLinesToJournalEntry(
+    journalId: string,
+    lines: { ledgerId: string; debit?: number; credit?: number }[]
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.journalLine.createMany({
+        data: lines.map(line => ({
+          journalId,
+          ledgerId: line.ledgerId,
+          debit: line.debit || 0,
+          credit: line.credit || 0
+        }))
+      });
+    });
+  }
+
+  async replaceJournalEntryLines(
+    journalEntryId: string,
+    lines: { ledgerId: string; debit?: number; credit?: number }[]
+  ): Promise<JournalEntryWithAll> {
+    return prisma.$transaction(async (tx) => {
+      // Remove all existing lines for this entry
+      await tx.journalLine.deleteMany({ where: { journalId: journalEntryId } });
+
+      // Insert the fresh set of lines
+      await tx.journalLine.createMany({
+        data: lines.map(line => ({
+          journalId: journalEntryId,
+          ledgerId: line.ledgerId,
+          debit: line.debit ?? 0,
+          credit: line.credit ?? 0
+        }))
+      });
+
+      return tx.journalEntry.findUniqueOrThrow({
+        where: { id: journalEntryId },
+        include: {
+          invoice: { select: { id: true, invoiceNumber: true, totalAmount: true, status: true, syncStatus: true } },
+          lines: { include: { ledger: { select: { id: true, name: true } } } }
+        }
+      }) as Promise<JournalEntryWithAll>;
+    });
+  }
 }
 
 export const ledgerRepository = new LedgerRepository();

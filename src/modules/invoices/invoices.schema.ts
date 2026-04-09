@@ -8,7 +8,9 @@ export const createInvoiceItemSchema = z.object({
   quantity: z.number().positive().multipleOf(0.01),
   unitPrice: z.number().positive().multipleOf(0.01),
   amount: z.number().positive().multipleOf(0.01),
-  taxRate: z.number().nonnegative().max(100).multipleOf(0.01)
+  taxRate: z.number().min(0).max(100),
+  ledgerId: z.string().uuid().optional(),
+  creditLedgerId: z.string().uuid().optional(),
 });
 
 export const createInvoiceSchema = z.object({

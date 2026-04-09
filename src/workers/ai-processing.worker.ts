@@ -107,6 +107,13 @@ const processMessage = async (message: any): Promise<WorkerProcessingResult> => 
       }
     }
 
+    let purchaseLedgerId: string | undefined;
+    if (client) {
+      const { ledgerRepository } = await import('../modules/ledger/ledger.repository');
+      const ledgers = await ledgerRepository.findLedgersByNames(['Purchase Account'], client.id);
+      purchaseLedgerId = ledgers.length > 0 ? ledgers[0].id : undefined;
+    }
+
     const aiMetadata = {
       processingStartedAt: invoice ? (invoice.aiMetadata as any)?.processingStartedAt : undefined,
       processingCompletedAt: new Date().toISOString(),
@@ -137,7 +144,8 @@ const processMessage = async (message: any): Promise<WorkerProcessingResult> => 
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           amount: i.amount,
-          taxRate: i.taxRate
+          taxRate: i.taxRate,
+          ledgerId: purchaseLedgerId
         })),
         clientId: client?.id,
       });
@@ -168,7 +176,8 @@ const processMessage = async (message: any): Promise<WorkerProcessingResult> => 
             unitPrice: i.unitPrice,
             amount: i.amount,
             taxRate: i.taxRate,
-            invoiceId: invoice.id
+            invoiceId: invoice.id,
+            ledgerId: purchaseLedgerId
           }))
         });
       });

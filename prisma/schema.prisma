@@ -283,6 +283,11 @@ model InvoiceItem {
 
   invoiceId   String
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  ledgerId    String?
+  ledger      Ledger?  @relation("ItemLedger", fields: [ledgerId], references: [id])
+  creditLedgerId String?
+  creditLedger   Ledger? @relation("ItemCreditLedger", fields: [creditLedgerId], references: [id])
 }
 
 /////////////////////////////////////////////////
@@ -298,6 +303,8 @@ model Ledger {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   journalLines   JournalLine[]
+  invoiceItems   InvoiceItem[] @relation("ItemLedger")
+  creditInvoiceItems InvoiceItem[] @relation("ItemCreditLedger")
   createdAt      DateTime @default(now())
 
   @@unique([clientId, name])

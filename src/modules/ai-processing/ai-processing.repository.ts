@@ -117,6 +117,8 @@ export class AIProcessingRepository {
       unitPrice: number;
       amount: number;
       taxRate: number;
+      ledgerId?: string;
+      creditLedgerId?: string;
     }[];
     clientId?: string;
     status?: InvoiceStatus;

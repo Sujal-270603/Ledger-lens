@@ -10,6 +10,12 @@ export type InvoiceWithWorkflowUsers = Prisma.InvoiceGetPayload<{
     rejectedBy: { select: { id: true; fullName: true; email: true } };
     reopenedBy: { select: { id: true; fullName: true; email: true } };
     client: { select: { id: true; name: true } };
+    items: {
+      include: {
+        ledger: { select: { id: true; name: true } },
+        creditLedger: { select: { id: true; name: true } }
+      }
+    };
   };
 }>;
 
@@ -33,6 +39,12 @@ export class WorkflowRepository {
         rejectedBy: { select: { id: true, fullName: true, email: true } },
         reopenedBy: { select: { id: true, fullName: true, email: true } },
         client: { select: { id: true, name: true } },
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
       }
     });
 
@@ -65,6 +77,12 @@ export class WorkflowRepository {
         rejectedBy: { select: { id: true, fullName: true, email: true } },
         reopenedBy: { select: { id: true, fullName: true, email: true } },
         client: { select: { id: true, name: true } },
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
       }
     });
   }
@@ -87,6 +105,12 @@ export class WorkflowRepository {
         rejectedBy: { select: { id: true, fullName: true, email: true } },
         reopenedBy: { select: { id: true, fullName: true, email: true } },
         client: { select: { id: true, name: true } },
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
       }
     });
   }
@@ -111,6 +135,12 @@ export class WorkflowRepository {
         rejectedBy: { select: { id: true, fullName: true, email: true } },
         reopenedBy: { select: { id: true, fullName: true, email: true } },
         client: { select: { id: true, name: true } },
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
       }
     });
   }
@@ -137,6 +167,12 @@ export class WorkflowRepository {
         rejectedBy: { select: { id: true, fullName: true, email: true } },
         reopenedBy: { select: { id: true, fullName: true, email: true } },
         client: { select: { id: true, name: true } },
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
       }
     });
   }

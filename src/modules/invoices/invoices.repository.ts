@@ -7,12 +7,23 @@ import { InvoiceFilters, CreateInvoiceItemInput } from './invoices.types';
 export type InvoiceListItemWithClient = Prisma.InvoiceGetPayload<{
   include: {
     client: { select: { id: true; name: true } };
+    items: {
+      include: {
+        ledger: { select: { id: true; name: true } },
+        creditLedger: { select: { id: true; name: true } }
+      }
+    };
   };
 }>;
 
 export type InvoiceWithAll = Prisma.InvoiceGetPayload<{
   include: {
-    items: true;
+    items: {
+      include: {
+        ledger: { select: { id: true; name: true } },
+        creditLedger: { select: { id: true; name: true } }
+      }
+    };
     client: { select: { id: true; name: true; gstin: true } };
     document: { select: { id: true; originalName: true } };
     submittedBy: { select: { id: true; fullName: true } };
@@ -62,7 +73,13 @@ export class InvoicesRepository {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          client: { select: { id: true, name: true } }
+          client: { select: { id: true, name: true } },
+          items: {
+            include: {
+              ledger: { select: { id: true, name: true } },
+              creditLedger: { select: { id: true, name: true } }
+            }
+          }
         }
       }),
       prisma.invoice.count({ where }),
@@ -79,7 +96,12 @@ export class InvoicesRepository {
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, organizationId },
       include: {
-        items: true,
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
         client: { select: { id: true, name: true, gstin: true } },
         document: { select: { id: true, originalName: true } },
         submittedBy: { select: { id: true, fullName: true } },
@@ -134,7 +156,12 @@ export class InvoicesRepository {
       return tx.invoice.findUniqueOrThrow({
         where: { id: invoice.id },
         include: {
-          items: true,
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
           client: { select: { id: true, name: true, gstin: true } },
           document: { select: { id: true, originalName: true } },
           submittedBy: { select: { id: true, fullName: true } },
@@ -177,7 +204,12 @@ export class InvoicesRepository {
       return tx.invoice.findUniqueOrThrow({
         where: { id: invoice.id },
         include: {
-          items: true,
+        items: {
+          include: {
+            ledger: { select: { id: true, name: true } },
+            creditLedger: { select: { id: true, name: true } }
+          }
+        },
           client: { select: { id: true, name: true, gstin: true } },
           document: { select: { id: true, originalName: true } },
           submittedBy: { select: { id: true, fullName: true } },
@@ -195,9 +227,13 @@ export class InvoicesRepository {
     });
   }
 
-  async findInvoiceItems(invoiceId: string): Promise<Prisma.InvoiceItemGetPayload<{}>[]> {
+  async findInvoiceItems(invoiceId: string): Promise<any[]> {
     return prisma.invoiceItem.findMany({
-      where: { invoiceId }
+      where: { invoiceId },
+      include: {
+        ledger: { select: { id: true, name: true } },
+        creditLedger: { select: { id: true, name: true } }
+      }
     });
   }
 
@@ -218,7 +254,11 @@ export class InvoicesRepository {
       });
 
       return tx.invoiceItem.findMany({
-        where: { invoiceId }
+        where: { invoiceId },
+        include: {
+          ledger: { select: { id: true, name: true } },
+          creditLedger: { select: { id: true, name: true } }
+        }
       });
     });
   }

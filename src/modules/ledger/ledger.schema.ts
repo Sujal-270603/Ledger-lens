@@ -17,21 +17,29 @@ export const updateLedgerSchema = z.object({
 
 export const createJournalLineSchema = z.object({
   ledgerId: z.string().uuid(),
-  debit: z.number().nonnegative().optional(),
-  credit: z.number().nonnegative().optional(),
+  debit: z.number().nonnegative().optional().default(0),
+  credit: z.number().nonnegative().optional().default(0),
 }).refine(data => {
-  return data.debit !== undefined || data.credit !== undefined;
+  // At least one must be greater than zero
+  return (data.debit || 0) > 0 || (data.credit || 0) > 0;
 }, {
-  message: 'Each journal line must have either a debit or credit amount',
+  message: 'Each journal line must have either a debit or credit amount greater than zero',
 }).refine(data => {
-  return !(data.debit !== undefined && data.credit !== undefined);
+  // Cannot have both greater than zero
+  return !((data.debit || 0) > 0 && (data.credit || 0) > 0);
 }, {
   message: 'A journal line cannot have both debit and credit amounts',
 });
 
 export const createJournalEntrySchema = z.object({
   invoiceId: z.string().uuid(),
-  entryDate: z.string().datetime({ offset: true }).or(z.string().datetime()), // ISO date string
+  entryDate: z.preprocess((val) => {
+    if (typeof val === 'string' && val.length > 0) {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? val : d.toISOString();
+    }
+    return val;
+  }, z.string().datetime({ offset: true }).or(z.string().datetime())), // ISO date string
   description: z.string().max(500).optional(),
   lines: z.array(createJournalLineSchema).min(2, 'Journal entry must have at least 2 lines'),
 }).refine(data => {

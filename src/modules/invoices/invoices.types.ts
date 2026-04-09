@@ -8,6 +8,8 @@ export interface CreateInvoiceItemInput {
   unitPrice: number;
   amount: number;
   taxRate: number;
+  ledgerId?: string;
+  creditLedgerId?: string;
 }
 
 export interface CreateInvoiceInput {
@@ -54,6 +56,16 @@ export interface InvoiceItemResponse {
   unitPrice: string;
   amount: string;
   taxRate: string;
+  ledgerId: string | null;
+  creditLedgerId: string | null;
+  ledger?: {
+    id: string;
+    name: string;
+  };
+  creditLedger?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface InvoiceResponse {
